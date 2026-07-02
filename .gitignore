@@ -1,24 +1,42 @@
+# Virtual environments
 .venv/
-.pytest_tmp/
-.pytest_cache/
-runs/
+.venv*/
+env/
+venv/
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
+# Test/cache outputs
+.pytest_cache/
+.pytest_tmp/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated benchmark/run outputs
+runs/
+runs_*/
+*.trace.jsonl
+
+# Environment/secrets
 .env
 .env.*
-.DS_Store
-.vscode/
-.idea/
+!.env.example
+
+# Build/package outputs
 dist/
 build/
 *.egg-info/
 
-__pycache__/
-*.py[cod]
-.pytest_cache/
-runs/
-*.egg-info/
-.venv/
-.env
+# IDE/editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

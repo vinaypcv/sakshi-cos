@@ -137,7 +137,7 @@ class AnthropicLLM:
     the rest of the system never hard-depends on the SDK.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-6",
+    def __init__(self, model: str = "claude-sonnet-5",
                  api_key: Optional[str] = None) -> None:
         try:
             import anthropic  # type: ignore

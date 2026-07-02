@@ -21,7 +21,7 @@ from ..agent.controller import ControllerConfig, ReliabilityController
 from ..agent.loop import SakshiAgent
 from ..agent.observer import MetaCognitiveObserver
 from ..agent.react import LLMReActWorker
-from ..core.embeddings import HashingEmbedder
+from ..core.embeddings import Embedder, HashingEmbedder
 from ..core.llm import LLM, MeteredLLM, Usage
 from ..core.state import CognitiveState
 from ..core.types import Assessment, ControlAction
@@ -58,16 +58,17 @@ class _Passive:
         return ControlAction.CONTINUE, "baseline"
 
 
-def _run_arm(tasks, make_ctrl, inner_llm: Optional[LLM], sim_latency: float):
+def _run_arm(tasks, make_ctrl, inner_llm: Optional[LLM], sim_latency: float,
+             embedder: Optional[Embedder] = None):
     outcomes: List[TaskOutcome] = []
     usage = Usage()
-    embedder = HashingEmbedder()
+    observer_embedder = embedder or HashingEmbedder()
     for t in tasks:
         inner = inner_llm if inner_llm is not None else FnLLM(t.mock_model_fn)
         model = MeteredLLM(inner, sim_latency=sim_latency)
         state = CognitiveState.new(t.task_id, t.goal)
         SakshiAgent(worker=LLMReActWorker(llm=model, tools=t.build_tools()),
-                    observer=MetaCognitiveObserver(embedder=embedder),
+                    observer=MetaCognitiveObserver(embedder=observer_embedder),
                     controller=make_ctrl(), max_steps=t.max_steps).run(state)
         ans = state.history[-1].worker_output if state.history else ""
         pk_d, mn_u, pk_c, pk_v = _signals(state)
@@ -86,12 +87,12 @@ def _by_mode(outcomes: List[TaskOutcome]) -> Dict[str, List[TaskOutcome]]:
 
 
 def run_scale(n_per_mode: int = 50, inner_llm: Optional[LLM] = None,
-              sim_latency: float = 0.0, model_name: str = "claude-sonnet-4-6",
-              seed: int = 7) -> Dict:
+              sim_latency: float = 0.0, model_name: str = "claude-sonnet-5",
+              seed: int = 7, embedder: Optional[Embedder] = None) -> Dict:
     tasks = generate(n_per_mode, seed)
-    base, base_u = _run_arm(tasks, lambda: _Passive(), inner_llm, sim_latency)
+    base, base_u = _run_arm(tasks, lambda: _Passive(), inner_llm, sim_latency, embedder)
     sak, sak_u = _run_arm(tasks, lambda: ReliabilityController(ControllerConfig()),
-                          inner_llm, sim_latency)
+                          inner_llm, sim_latency, embedder)
 
     base_by, sak_by = _by_mode(base), _by_mode(sak)
     report: Dict = {"n_per_mode": n_per_mode, "n_tasks": len(tasks), "model": model_name,

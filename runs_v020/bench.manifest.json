@@ -1,0 +1,38 @@
+{
+  "run_id": "bench",
+  "created": "2026-07-01T18:20:25",
+  "duration_s": 0.041,
+  "python": "3.14.5",
+  "config": {
+    "suite": "scripted",
+    "arms": [
+      "baseline",
+      "sakshi"
+    ]
+  },
+  "metrics": {
+    "baseline": {
+      "n_tasks": 4,
+      "success_rate": 0.25,
+      "mean_peak_drift": 0.2243,
+      "mean_final_drift": 0.2121,
+      "mean_uncertainty": 0.2387,
+      "total_interventions": 0,
+      "recovery_rate": 0.0
+    },
+    "sakshi": {
+      "n_tasks": 4,
+      "success_rate": 1.0,
+      "mean_peak_drift": 0.2121,
+      "mean_final_drift": 0.0,
+      "mean_uncertainty": 0.2177,
+      "total_interventions": 7,
+      "recovery_rate": 0.25
+    },
+    "delta": {
+      "success_rate": 0.75,
+      "mean_final_drift": -0.2121,
+      "recovery_rate": 0.25
+    }
+  }
+}

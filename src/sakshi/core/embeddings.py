@@ -71,6 +71,29 @@ class HashingEmbedder:
         return vec
 
 
+class SentenceTransformerEmbedder:
+    """Learned local embedding model for semantic goal-drift detection.
+
+    This is optional because it pulls in sentence-transformers/PyTorch. The
+    default HashingEmbedder remains standard-library-only for CI and offline
+    reproducibility.
+    """
+
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
+        try:
+            from sentence_transformers import SentenceTransformer  # type: ignore
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise ImportError(
+                "SentenceTransformerEmbedder requires: pip install -e .[embed]"
+            ) from exc
+        self.model_name = model_name
+        self._model = SentenceTransformer(model_name)
+
+    def embed(self, text: str) -> List[float]:  # pragma: no cover - model download/runtime
+        vec = self._model.encode(text, normalize_embeddings=True, convert_to_numpy=True)
+        return [float(x) for x in vec.tolist()]
+
+
 def semantic_distance(embedder: Embedder, a: str, b: str) -> float:
     """Return a drift value in [0, 1]; 0 = identical focus, 1 = unrelated."""
     sim = cosine(embedder.embed(a), embedder.embed(b))

@@ -13,9 +13,12 @@ from ..core.llm import Usage
 
 # USD per million tokens. ILLUSTRATIVE — verify and override for real reporting.
 PRICING: Dict[str, Dict[str, float]] = {
-    "claude-opus-4-8":   {"in": 15.0, "out": 75.0},
+    "claude-fable-5":    {"in": 10.0, "out": 50.0},
+    "claude-opus-4-8":   {"in": 5.0,  "out": 25.0},
+    "claude-sonnet-5":   {"in": 3.0,  "out": 15.0},
+    "claude-haiku-4-5":  {"in": 1.0,  "out": 5.0},
+    # Backward-compatible aliases from older reports.
     "claude-sonnet-4-6": {"in": 3.0,  "out": 15.0},
-    "claude-haiku-4-5":  {"in": 0.80, "out": 4.0},
     "_default":          {"in": 3.0,  "out": 15.0},
 }
 

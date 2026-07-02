@@ -80,13 +80,23 @@ def cmd_scale(args) -> None:
         return
 
     inner = None
-    if args.live:
+    if args.cassette and args.cassette_mode == "replay" and not args.live:
+        from .core.llm import CassetteLLM
+        inner = CassetteLLM(args.cassette, mode="replay")
+    elif args.live:
         from .core.llm import AnthropicLLM, CassetteLLM
         base = AnthropicLLM(model=args.model)
         inner = CassetteLLM(args.cassette, mode=args.cassette_mode, inner=base) if args.cassette else base
+    elif args.cassette:
+        raise SystemExit("cassette record requires --live; replay can run without --live")
+
+    embedder = None
+    if args.embedder == "sbert":
+        from .core.embeddings import SentenceTransformerEmbedder
+        embedder = SentenceTransformerEmbedder(args.embedding_model)
 
     r = run_scale(n_per_mode=args.n, inner_llm=inner, sim_latency=args.sim_latency,
-                  model_name=args.model, seed=args.seed)
+                  model_name=args.model, seed=args.seed, embedder=embedder)
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "scale_report.json"), "w") as f:
         _json.dump(r, f, indent=2)
@@ -106,11 +116,14 @@ def main() -> None:
     sp = sub.add_parser("scale", help="scale evaluation with CIs, cost, calibration")
     sp.add_argument("--n", type=int, default=50, help="tasks per failure mode")
     sp.add_argument("--seed", type=int, default=7)
-    sp.add_argument("--model", default="claude-sonnet-4-6")
+    sp.add_argument("--model", default="claude-sonnet-5")
     sp.add_argument("--live", action="store_true", help="use a real Anthropic model")
     sp.add_argument("--cassette", default="", help="record/replay path")
     sp.add_argument("--cassette-mode", default="record", choices=["record", "replay"])
     sp.add_argument("--sim-latency", type=float, default=0.0, help="offline synthetic latency/call")
+    sp.add_argument("--embedder", choices=["hash", "sbert"], default="hash",
+                    help="goal-drift embedder: standard-library hash or sentence-transformers")
+    sp.add_argument("--embedding-model", default="sentence-transformers/all-MiniLM-L6-v2")
     sp.add_argument("--dry-run", action="store_true", help="print cost projection and exit")
     args = ap.parse_args()
 

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sakshi-COS · Cognitive Telemetry</title>
+<style>
+  :root{
+    --ink:#0E1116; --panel:#161B22; --panel-2:#1C232C; --line:#2A3340;
+    --text:#C9D1D9; --muted:#7D8896; --bright:#EAF0F6;
+    --teal:#3FB6A8;        /* healthy / continue */
+    --amber:#E8A33D;       /* drift / uncertainty */
+    --magenta:#D2569B;     /* intervention */
+    --violet:#8C7BE8;      /* conflict */
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  header{padding:34px 28px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#11161D,#0E1116)}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.32em;
+    text-transform:uppercase;color:var(--muted)}
+  h1{margin:.35em 0 .15em;font-size:clamp(26px,4vw,40px);font-weight:650;
+    letter-spacing:-.02em;color:var(--bright)}
+  .sub{color:var(--muted);max-width:60ch;line-height:1.55;font-size:14px}
+  main{padding:24px 28px 64px;max-width:1100px;margin:0 auto}
+  .loader{display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    padding:16px;border:1px dashed var(--line);border-radius:10px;margin:22px 0 30px}
+  .loader label{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  input[type=file]{font-family:var(--mono);font-size:12px;color:var(--text)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);
+    font-size:11px;color:var(--muted);margin-left:auto}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+  .compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:14px;margin:8px 0 34px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .stat .k{font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-size:30px;font-weight:600;color:var(--bright);margin-top:6px;font-variant-numeric:tabular-nums}
+  .stat .d{font-family:var(--mono);font-size:12px;margin-top:4px}
+  .up{color:var(--teal)} .down{color:var(--amber)}
+  h2{font-size:14px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);border-top:1px solid var(--line);padding-top:22px;margin-top:30px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 16px 12px;overflow:hidden}
+  .card h3{margin:0;font-size:15px;color:var(--bright);font-weight:600}
+  .meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin:3px 0 12px;
+    display:flex;justify-content:space-between}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;
+    border:1px solid var(--line)}
+  .pass{color:var(--teal);border-color:#214b45;background:#10211f}
+  .fail{color:var(--amber);border-color:#4b3a1a;background:#211a10}
+  .strip{width:100%;height:120px;display:block}
+  .ticks{font-family:var(--mono);font-size:9px;fill:var(--muted)}
+  .empty{color:var(--muted);font-family:var(--mono);font-size:13px;padding:40px 0;text-align:center}
+  footer{color:var(--muted);font-family:var(--mono);font-size:11px;padding:0 28px 40px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Sakshi-COS · Reliability Telemetry</div>
+  <h1>Cognitive vital signs</h1>
+  <p class="sub">Every step of a long-horizon run, read as a signal: goal drift, uncertainty,
+  and belief conflict over time, with the moments the controller intervened. Load a
+  benchmark trace file to inspect a run.</p>
+</header>
+<main>
+  <div class="loader">
+    <label>Load trace JSON (runs/bench/traces_*.json — pick one or both arms):</label>
+    <input id="file" type="file" accept="application/json" multiple>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--amber)"></i>drift</span>
+      <span><i class="dot" style="background:var(--violet)"></i>conflict</span>
+      <span><i class="dot" style="background:var(--teal)"></i>uncertainty</span>
+      <span><i class="dot" style="background:var(--magenta)"></i>intervention</span>
+    </div>
+  </div>
+  <div id="compare"></div>
+  <div id="content"><div class="empty">No run loaded yet. Select a trace file above.</div></div>
+</main>
+<footer>Sakshi-COS — meta-cognitive infrastructure for reliable long-horizon AI agents</footer>
+
+<script>
+const arms = {}; // arm -> parsed file
+const I = id => document.getElementById(id);
+
+I('file').addEventListener('change', async e => {
+  for (const f of e.target.files){
+    try{
+      const data = JSON.parse(await f.text());
+      const arm = data.arm || f.name.replace(/^traces_|\.json$/g,'') || 'run';
+      arms[arm] = data;
+    }catch(err){ alert('Could not parse '+f.name+': '+err.message); }
+  }
+  render();
+});
+
+function pct(x){ return (x*100).toFixed(0)+'%'; }
+
+function renderCompare(){
+  const c = I('compare'); c.innerHTML='';
+  const b = arms.baseline?.summary, s = arms.sakshi?.summary;
+  if(!b || !s) return;
+  const rows = [
+    ['Success rate', s.success_rate, b.success_rate, true],
+    ['Mean final drift', s.mean_final_drift, b.mean_final_drift, false],
+    ['Recovery rate', s.recovery_rate, b.recovery_rate, true],
+    ['Interventions', s.total_interventions, b.total_interventions, null],
+  ];
+  const wrap = document.createElement('div'); wrap.className='compare';
+  for(const [k,sv,bv,higherBetter] of rows){
+    const delta = (sv-bv);
+    let cls='', d='';
+    if(higherBetter!==null){
+      const good = higherBetter ? delta>0 : delta<0;
+      cls = good?'up':'down';
+      d = (delta>=0?'+':'')+(Number.isInteger(delta)?delta:delta.toFixed(3))+' vs baseline';
+    } else { d = 'baseline: '+bv; }
+    const fmt = v => Number.isInteger(v)? v : (k.includes('rate')||k.includes('drift')? (k.includes('rate')?pct(v):v.toFixed(3)) : v);
+    wrap.innerHTML += `<div class="stat"><div class="k">${k}</div>
+      <div class="v">${fmt(sv)}</div><div class="d ${cls}">${d}</div></div>`;
+  }
+  c.appendChild(wrap);
+}
+
+function strip(history){
+  // SVG polygraph: drift/conflict/uncertainty lines + intervention ticks.
+  const W=300,H=120,padL=6,padR=6,padT=10,padB=18;
+  const n=history.length;
+  const x=i=> n<=1?padL : padL+(W-padL-padR)*i/(n-1);
+  const y=v=> padT+(H-padT-padB)*(1-v);
+  const path=(key)=> history.map((h,i)=>`${i?'L':'M'}${x(i).toFixed(1)} ${y(h.assessment[key]).toFixed(1)}`).join(' ');
+  let ticks='';
+  history.forEach((h,i)=>{
+    if(h.action!=='continue'){
+      ticks += `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${H-padB}"
+        stroke="var(--magenta)" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <text class="ticks" x="${x(i)}" y="${H-6}" text-anchor="middle">${h.action[0].toUpperCase()}</text>`;
+    }
+  });
+  // threshold guide for replan drift = 0.6
+  const gy=y(0.6);
+  return `<svg class="strip" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>
+    <text class="ticks" x="${W-padR}" y="${gy-3}" text-anchor="end">drift→replan 0.6</text>
+    ${ticks}
+    <path d="${path('uncertainty')}" fill="none" stroke="var(--teal)" stroke-width="1.5" opacity="0.85"/>
+    <path d="${path('conflict_score')}" fill="none" stroke="var(--violet)" stroke-width="1.5" opacity="0.85"/>
+    <path d="${path('goal_drift')}" fill="none" stroke="var(--amber)" stroke-width="2"/>
+  </svg>`;
+}
+
+function render(){
+  renderCompare();
+  // Prefer the sakshi arm for the per-task strips; else first available.
+  const arm = arms.sakshi ? 'sakshi' : Object.keys(arms)[0];
+  const data = arms[arm];
+  const content = I('content');
+  if(!data){ return; }
+  const tasks = Object.keys(data.traces||{});
+  if(!tasks.length){ content.innerHTML='<div class="empty">File has no task traces.</div>'; return; }
+  let html = `<h2>Per-task cognition · ${arm} arm</h2><div class="grid">`;
+  for(const tid of tasks){
+    const tr = data.traces[tid];
+    const e = data.per_task[tid] || {};
+    const ok = (e.success??0) >= 1;
+    html += `<div class="card">
+      <h3>${tid}</h3>
+      <div class="meta"><span>${e.failure_mode||''}</span>
+        <span class="badge ${ok?'pass':'fail'}">${ok?'PASS':'FAIL'}</span></div>
+      ${strip(tr.history)}
+      <div class="meta"><span>${tr.history.length} steps · ${e.intervention_count??0} interventions</span>
+        <span>peak drift ${(e.peak_drift??0).toFixed(2)}</span></div>
+    </div>`;
+  }
+  html += `</div>`;
+  content.innerHTML = html;
+}
+</script>
+</body>
+</html>
